@@ -1,4 +1,3 @@
-```javascript
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -12,22 +11,20 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-// Health check
 app.get("/", (req, res) => {
   res.json({
     message: "AI IDE backend is running!",
   });
 });
 
-// AI Chat - Demo Mode
-app.post("/api/chat", async (req, res) => {
-  const { message, files } = req.body;
+app.post("/api/chat", (req, res) => {
+  const { message } = req.body;
 
   console.log("User message:", message);
 
   if (!message || !message.trim()) {
     return res.status(400).json({
-      error: "Message is required.",
+      error: "Message is required",
     });
   }
 
@@ -35,30 +32,23 @@ app.post("/api/chat", async (req, res) => {
 
   let reply;
 
-  if (
-    text.includes("hello") ||
-    text.includes("hi") ||
-    text.includes("hey")
-  ) {
+  if (text.includes("hello") || text.includes("hi") || text.includes("hey")) {
     reply =
       "Hello! 👋\n\n" +
       "I'm your AI IDE demo assistant.\n\n" +
       "Try asking me:\n" +
       "• Explain the code\n" +
       "• Debug this code\n" +
-      "• Improve this code\n" +
-      "• What does this function do?";
+      "• Improve this code";
   } else if (text.includes("explain")) {
     reply =
       "🤖 Demo AI Assistant\n\n" +
-      "This project is a React-based AI IDE.\n\n" +
-      "The main parts are:\n\n" +
-      "1. Explorer — displays project files.\n" +
-      "2. Monaco Editor — allows you to edit code.\n" +
-      "3. Run button — generates the React preview.\n" +
-      "4. Terminal — displays execution information.\n" +
-      "5. AI Assistant — communicates with the backend.\n\n" +
-      "The current project is running in Demo AI mode.";
+      "Your AI IDE contains an Explorer, Monaco Code Editor, " +
+      "Terminal, Preview panel, and AI Assistant.\n\n" +
+      "The Explorer shows your files. " +
+      "The Monaco Editor lets you edit code. " +
+      "The Run button creates the preview. " +
+      "The AI Assistant communicates with this backend.";
   } else if (
     text.includes("debug") ||
     text.includes("error") ||
@@ -66,12 +56,8 @@ app.post("/api/chat", async (req, res) => {
   ) {
     reply =
       "🤖 Demo AI Assistant\n\n" +
-      "To debug your code, check these areas:\n\n" +
-      "1. Browser Console\n" +
-      "2. Terminal output\n" +
-      "3. The file containing the error\n" +
-      "4. Network requests to the backend\n\n" +
-      "Your AI IDE backend is connected successfully.";
+      "For debugging, check the browser console, " +
+      "terminal output, and the file containing the error.";
   } else if (
     text.includes("improve") ||
     text.includes("better") ||
@@ -79,26 +65,22 @@ app.post("/api/chat", async (req, res) => {
   ) {
     reply =
       "🤖 Demo AI Assistant\n\n" +
-      "Possible improvements for your AI IDE:\n\n" +
-      "• Add file creation and deletion\n" +
-      "• Add multiple editor tabs\n" +
+      "Possible improvements:\n\n" +
+      "• Add file creation\n" +
+      "• Add file deletion\n" +
+      "• Add multiple tabs\n" +
       "• Improve the terminal\n" +
-      "• Add a real code execution system\n" +
-      "• Add AI-powered code suggestions\n" +
-      "• Add Git integration\n" +
-      "• Add deployment controls";
+      "• Add real code execution\n" +
+      "• Add Git integration";
   } else {
     reply =
       "🤖 Demo AI Assistant\n\n" +
-      `You asked: "${message}"\n\n` +
+      'You asked: "' +
+      message +
+      '"\n\n' +
       "I received your request successfully.\n\n" +
-      "Try asking:\n" +
-      "• Explain the code\n" +
-      "• Debug this code\n" +
-      "• Improve this code";
+      "Try asking me to explain, debug, or improve your code.";
   }
-
-  console.log("Sending demo response.");
 
   res.json({
     reply: reply,
@@ -106,7 +88,6 @@ app.post("/api/chat", async (req, res) => {
   });
 });
 
-// Start server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`AI IDE backend running on port ${PORT}`);
+  console.log("AI IDE backend running on port " + PORT);
 });
