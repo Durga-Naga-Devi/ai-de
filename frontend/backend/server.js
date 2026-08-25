@@ -1,25 +1,28 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
-const dotenv = require("dotenv");
 const OpenAI = require("openai");
-
-dotenv.config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-const client = new OpenAI({
+const PORT = process.env.PORT || 5000;
+
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Health check
 app.get("/", (req, res) => {
   res.json({
     message: "AI IDE backend is running!",
   });
 });
 
+// AI chat
 app.post("/api/chat", async (req, res) => {
   try {
     const { message, files } = req.body;
@@ -32,17 +35,22 @@ app.post("/api/chat", async (req, res) => {
       });
     }
 
-    let projectCode = "";
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is missing");
 
-    if (files) {
-      projectCode = Object.entries(files)
-        .map(([fileName, fileData]) => {
-          return `
-===== ${fileName} =====
-${fileData.code || ""}
-`;
-        })
-        .join("\n");
+      return res.status(500).json({
+        error: "OPENAI_API_KEY is not configured",
+      });
+    }
+
+    // Convert the files object into readable text
+    let codeContext = "";
+
+    if (files && typeof files === "object") {
+      for (const [filename, file] of Object.entries(files)) {
+        codeContext += `\n\n--- ${filename} ---\n`;
+        codeContext += file?.code || "";
+      }
     }
 
     const prompt = `
@@ -54,39 +62,47 @@ ${message}
 
 Here is the user's project code:
 
-${projectCode}
+${codeContext}
 
-Analyze the code and give a clear, useful answer.
-
-If the user asks you to explain the code, explain what the code does in simple language.
-
-If the user asks for a bug fix, identify the problem and provide corrected code when appropriate.
-
-If the user asks for improvements, suggest practical improvements.
+Give a clear and helpful answer.
+If the user asks to explain code, explain it in simple language.
+If they ask to fix code, provide the corrected code.
 `;
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: prompt,
+    console.log("Sending request to OpenAI...");
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful AI coding assistant.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
     });
 
-    const reply = response.output_text;
+    const reply =
+      completion.choices?.[0]?.message?.content ||
+      "I couldn't generate a response.";
+
+    console.log("AI response received");
 
     res.json({
-      reply: reply,
+      reply,
     });
   } catch (error) {
-    console.error("OpenAI error:", error);
+    console.error("OpenAI/backend error:", error);
 
     res.status(500).json({
-      error: "AI backend error",
-      details: error.message,
+      error: error.message || "AI backend error",
     });
   }
 });
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`AI IDE backend running on port ${PORT}`);
 });
