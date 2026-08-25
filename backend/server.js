@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -30,9 +30,15 @@ app.post("/api/chat", async (req, res) => {
 
     console.log("User message:", message);
 
-    if (!message) {
+    if (!message || !message.trim()) {
       return res.status(400).json({
         error: "Message is required",
+      });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY is missing",
       });
     }
 
@@ -57,6 +63,7 @@ Help the user with the code.
 If they ask for an explanation, explain it clearly.
 If they ask for debugging, identify the problem and provide corrected code.
 If they ask for improvements, suggest improvements and provide code.
+If they ask you to write code, provide complete usable code.
 `;
 
     console.log("Sending request to Gemini...");
@@ -68,7 +75,7 @@ If they ask for improvements, suggest improvements and provide code.
     console.log("Gemini response received.");
 
     res.json({
-      reply: reply,
+      reply,
     });
   } catch (error) {
     console.error("Gemini error:", error);
@@ -81,13 +88,9 @@ If they ask for improvements, suggest improvements and provide code.
 });
 
 const server = app.listen(PORT, () => {
-  console.log(`AI IDE Gemini backend running on http://localhost:${PORT}`);
+  console.log(`AI IDE Gemini backend running on port ${PORT}`);
 });
 
 server.on("error", (error) => {
   console.error("SERVER ERROR:", error);
 });
-
-setInterval(() => {
-  console.log("Backend is still running...");
-}, 10000);
