@@ -1,8 +1,9 @@
-require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
+const dotenv = require("dotenv");
 const OpenAI = require("openai");
+
+dotenv.config();
 
 const app = express();
 
@@ -13,32 +14,55 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+app.get("/", (req, res) => {
+  res.json({
+    message: "AI IDE backend is running!",
+  });
+});
+
 app.post("/api/chat", async (req, res) => {
   try {
     const { message, files } = req.body;
 
-    const projectCode = files
-      ? Object.entries(files)
-          .map(([fileName, fileData]) => {
-            return `
+    console.log("User message:", message);
+
+    if (!message) {
+      return res.status(400).json({
+        error: "Message is required",
+      });
+    }
+
+    let projectCode = "";
+
+    if (files) {
+      projectCode = Object.entries(files)
+        .map(([fileName, fileData]) => {
+          return `
 ===== ${fileName} =====
 ${fileData.code || ""}
 `;
-          })
-          .join("\n")
-      : "No project files were provided.";
+        })
+        .join("\n");
+    }
 
     const prompt = `
-You are the AI coding assistant inside an AI IDE.
+You are an AI coding assistant inside an AI IDE.
 
 The user asked:
+
 ${message}
 
-Here is the user's complete project:
+Here is the user's project code:
 
 ${projectCode}
 
-Give a helpful coding answer.
+Analyze the code and give a clear, useful answer.
+
+If the user asks you to explain the code, explain what the code does in simple language.
+
+If the user asks for a bug fix, identify the problem and provide corrected code when appropriate.
+
+If the user asks for improvements, suggest practical improvements.
 `;
 
     const response = await client.responses.create({
@@ -46,8 +70,10 @@ Give a helpful coding answer.
       input: prompt,
     });
 
+    const reply = response.output_text;
+
     res.json({
-      reply: response.output_text,
+      reply: reply,
     });
   } catch (error) {
     console.error("OpenAI error:", error);
@@ -59,6 +85,8 @@ Give a helpful coding answer.
   }
 });
 
-app.listen(5000, () => {
-  console.log("Backend running on http://localhost:5000");
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`AI IDE backend running on port ${PORT}`);
 });
