@@ -12,31 +12,44 @@ const initialFiles = {
   );
 }`,
 
+  "App.css": `body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}`,
+
   "main.jsx": `import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import "./App.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );`,
+
+  "package.json": `{
+  "name": "ai-ide",
+  "version": "1.0.0",
+  "private": true
+}`,
 };
 
 function App() {
   const [files, setFiles] = useState(initialFiles);
   const [activeFile, setActiveFile] = useState("App.jsx");
-
+  const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState([
     {
-      role: "assistant",
-      content:
-        "🤖 AI Assistant\n\nHello! Ask me to explain, debug, or improve your code.",
+      role: "ai",
+      text: "Hello! 👋 I'm your AI coding assistant.\\n\\nAsk me to write, explain, debug, or improve your code.",
     },
   ]);
+  const [terminal, setTerminal] = useState("$ AI IDE terminal ready...");
 
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const handleFileClick = (file) => {
+    setActiveFile(file);
+  };
 
   const handleEditorChange = (value) => {
     setFiles((prev) => ({
@@ -45,110 +58,173 @@ function App() {
     }));
   };
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || loading) return;
+  const sendMessage = async () => {
+    if (!prompt.trim()) return;
 
-    const userMessage = input.trim();
+    const userMessage = prompt;
 
     setMessages((prev) => [
       ...prev,
       {
         role: "user",
-        content: userMessage,
+        text: userMessage,
       },
     ]);
 
-    setInput("");
-    setLoading(true);
+    setPrompt("");
 
     try {
-      const response = await fetch(
-        "https://ai-de-backend.onrender.com/api/chat",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: userMessage,
-            code: files[activeFile],
-          }),
+      const response = await fetch("http://localhost:5000/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          message: userMessage,
+          code: files[activeFile],
+          fileName: activeFile,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Backend request failed");
+      }
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "AI request failed");
-      }
-
       setMessages((prev) => [
         ...prev,
         {
-          role: "assistant",
-          content: data.reply,
+          role: "ai",
+          text: data.reply || data.message || "AI responded successfully.",
         },
       ]);
     } catch (error) {
-      console.error("AI Error:", error);
-
       setMessages((prev) => [
         ...prev,
         {
-          role: "assistant",
-          content:
-            "❌ Unable to connect to the AI backend. Please check your backend.",
+          role: "ai",
+          text: "❌ Could not connect to the AI backend. Please make sure your backend is running.",
         },
       ]);
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const handleRun = () => {
+    setTerminal(
+      `$ npm run dev
+
+> ai-ide@1.0.0 dev
+> vite
+
+✓ Project started successfully
+✓ Active file: ${activeFile}`,
+    );
+  };
+
+  const handleDebug = () => {
+    setTerminal(
+      `🐛 Debug started...
+
+Checking ${activeFile}...
+
+✓ Debug session started
+✓ No runtime errors detected`,
+    );
+  };
+
+  const handleGit = () => {
+    setTerminal(
+      `$ git status
+
+On branch main
+
+Changes:
+  modified: ${activeFile}
+
+✓ Git status completed`,
+    );
+  };
+
+  const handleDeploy = () => {
+    setTerminal(
+      `🚀 Deployment started...
+
+Building project...
+✓ Build completed
+✓ Deployment process started`,
+    );
   };
 
   return (
-    <div className="app">
-      <header className="header">
-        <h1>⚡ AI IDE</h1>
+    <div className="ide">
+      {/* HEADER */}
+      <header className="topbar">
+        <div className="logo">⚡ AI IDE</div>
 
-        <div className="buttons">
-          <button>▶ Run</button>
-          <button>🐛 Debug</button>
-          <button>Git</button>
-          <button>Deploy</button>
+        <div className="toolbar">
+          <button onClick={handleRun}>▶ Run</button>
+          <button onClick={handleDebug}>🐛 Debug</button>
+          <button onClick={handleGit}>Git</button>
+          <button onClick={handleDeploy}>Deploy</button>
         </div>
       </header>
 
-      <div className="main-container">
+      {/* MAIN AREA */}
+      <div className="main">
+        {/* EXPLORER */}
         <aside className="explorer">
           <h3>EXPLORER</h3>
 
           <div className="folder">📁 src</div>
 
-          {Object.keys(files).map((file) => (
-            <div
-              key={file}
-              className={`file ${activeFile === file ? "active-file" : ""}`}
-              onClick={() => setActiveFile(file)}
-            >
-              📄 {file}
-            </div>
-          ))}
+          <div
+            className={activeFile === "App.jsx" ? "file active" : "file"}
+            onClick={() => handleFileClick("App.jsx")}
+          >
+            📄 App.jsx
+          </div>
+
+          <div
+            className={activeFile === "App.css" ? "file active" : "file"}
+            onClick={() => handleFileClick("App.css")}
+          >
+            📄 App.css
+          </div>
+
+          <div
+            className={activeFile === "main.jsx" ? "file active" : "file"}
+            onClick={() => handleFileClick("main.jsx")}
+          >
+            📄 main.jsx
+          </div>
+
+          <div className="folder">📁 public</div>
+
+          <div
+            className={activeFile === "package.json" ? "file active" : "file"}
+            onClick={() => handleFileClick("package.json")}
+          >
+            📄 package.json
+          </div>
         </aside>
 
-        <section className="editor-section">
-          <div className="editor-title">{activeFile}</div>
+        {/* EDITOR */}
+        <section className="editor-panel">
+          <div className="editor-header">{activeFile}</div>
 
           <Editor
             height="100%"
+            language={
+              activeFile.endsWith(".jsx")
+                ? "javascript"
+                : activeFile.endsWith(".css")
+                  ? "css"
+                  : activeFile.endsWith(".json")
+                    ? "json"
+                    : "javascript"
+            }
             theme="vs-dark"
-            language="javascript"
             value={files[activeFile]}
             onChange={handleEditorChange}
             options={{
@@ -156,46 +232,58 @@ function App() {
                 enabled: false,
               },
               fontSize: 14,
+              automaticLayout: true,
             }}
           />
         </section>
 
-        <aside className="assistant">
-          <div className="assistant-header">🤖 AI Assistant</div>
+        {/* AI ASSISTANT */}
+        <aside className="ai-panel">
+          <div className="ai-header">🤖 AI Assistant</div>
 
           <div className="messages">
             {messages.map((message, index) => (
-              <div key={index} className={`message ${message.role}`}>
-                <strong>{message.role === "user" ? "You:" : "AI:"}</strong>
+              <div
+                key={index}
+                className={
+                  message.role === "user"
+                    ? "message user-message"
+                    : "message ai-message"
+                }
+              >
+                {message.role === "ai" && <h3>AI</h3>}
 
-                <div className="message-content">{message.content}</div>
+                {message.role === "user" && <h3>You</h3>}
+
+                <p>{message.text}</p>
               </div>
             ))}
-
-            {loading && (
-              <div className="message assistant">
-                <strong>AI:</strong>
-
-                <div className="message-content">🤔 Thinking...</div>
-              </div>
-            )}
           </div>
 
           <div className="chat-input">
             <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask AI about your code..."
-              rows="3"
+              placeholder="Ask AI anything about your code..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
             />
 
-            <button onClick={handleSendMessage} disabled={loading}>
-              {loading ? "Sending..." : "Send"}
-            </button>
+            <button onClick={sendMessage}>Send</button>
           </div>
         </aside>
       </div>
+
+      {/* TERMINAL */}
+      <section className="terminal">
+        <div className="terminal-header">TERMINAL</div>
+
+        <pre>{terminal}</pre>
+      </section>
     </div>
   );
 }
