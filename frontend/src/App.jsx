@@ -72,17 +72,19 @@ function App() {
   ]);
 
   const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   const currentFile = files[activeFile];
 
+  // EDITOR
   const handleEditorChange = (value) => {
-    setFiles({
-      ...files,
+    setFiles((previousFiles) => ({
+      ...previousFiles,
       [activeFile]: {
-        ...files[activeFile],
+        ...previousFiles[activeFile],
         code: value || "",
       },
-    });
+    }));
   };
 
   // RUN
@@ -106,50 +108,68 @@ function App() {
 
   // AI ASSISTANT
   const handleAISend = async () => {
-    if (!aiInput.trim()) return;
+    if (!aiInput.trim() || aiLoading) return;
 
-    const messageToSend = aiInput;
+    const messageToSend = aiInput.trim();
 
-    const userMessage = {
-      role: "user",
-      text: messageToSend,
-    };
-
-    setAiMessages((messages) => [...messages, userMessage]);
+    // Show user's message
+    setAiMessages((messages) => [
+      ...messages,
+      {
+        role: "user",
+        text: messageToSend,
+      },
+    ]);
 
     setAiInput("");
+    setAiLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/chat", {
-        method: "POST",
+      const response = await fetch(
+        "https://ai-de-backend.onrender.com/api/chat",
+        {
+          method: "POST",
 
-        headers: {
-          "Content-Type": "application/json",
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            message: messageToSend,
+            files: files,
+          }),
         },
-
-        body: JSON.stringify({
-          message: userMessage,
-          code: files["App.jsx"].code,
-        }),
-      });
+      );
 
       const data = await response.json();
 
+      console.log("Backend response:", data);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Backend error");
+      }
+
       setAiMessages((messages) => [
         ...messages,
         {
           role: "ai",
-          text: data.reply,
+          text: data.reply || "No response received from the AI.",
         },
       ]);
     } catch (error) {
+      console.error("AI Error:", error);
+
       setAiMessages((messages) => [
         ...messages,
         {
           role: "ai",
-          text: "❌ Could not connect to AI backend.",
+          text:
+            "❌ Could not connect to AI backend.\n\n" +
+            "Please make sure the Render backend is running.",
         },
       ]);
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -269,21 +289,34 @@ function App() {
                 <p>{message.text}</p>
               </div>
             ))}
+
+            {aiLoading && (
+              <div className="ai-message ai">
+                <strong>AI:</strong>
+
+                <p>Thinking... ⏳</p>
+              </div>
+            )}
           </div>
 
+          {/* AI INPUT */}
           <div className="assistant-input">
             <input
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
                   handleAISend();
                 }
               }}
               placeholder="Ask AI anything..."
+              disabled={aiLoading}
             />
 
-            <button onClick={handleAISend}>Send</button>
+            <button onClick={handleAISend} disabled={aiLoading}>
+              {aiLoading ? "..." : "Send"}
+            </button>
           </div>
         </aside>
       </div>

@@ -17,12 +17,6 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message, files } = req.body;
 
-    if (!message) {
-      return res.status(400).json({
-        error: "Message is required",
-      });
-    }
-
     const projectCode = files
       ? Object.entries(files)
           .map(([fileName, fileData]) => {
@@ -45,9 +39,6 @@ Here is the user's complete project:
 ${projectCode}
 
 Give a helpful coding answer.
-If the user asks to explain code, explain it clearly.
-If they ask to fix code, show the corrected code.
-If they ask about an error, identify the likely cause and solution.
 `;
 
     const response = await client.responses.create({
