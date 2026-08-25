@@ -39,12 +39,15 @@ function App() {
   const [files, setFiles] = useState(initialFiles);
   const [activeFile, setActiveFile] = useState("App.jsx");
   const [prompt, setPrompt] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
   const [messages, setMessages] = useState([
     {
       role: "ai",
-      text: "Hello! 👋 I'm your AI coding assistant.\\n\\nAsk me to write, explain, debug, or improve your code.",
+      text: "Hello! 👋 I'm your AI coding assistant.\n\nAsk me to write, explain, debug, or improve your code.",
     },
   ]);
+
   const [terminal, setTerminal] = useState("$ AI IDE terminal ready...");
 
   const handleFileClick = (file) => {
@@ -59,9 +62,9 @@ function App() {
   };
 
   const sendMessage = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || isLoading) return;
 
-    const userMessage = prompt;
+    const userMessage = prompt.trim();
 
     setMessages((prev) => [
       ...prev,
@@ -72,6 +75,7 @@ function App() {
     ]);
 
     setPrompt("");
+    setIsLoading(true);
 
     try {
       const response = await fetch(
@@ -83,33 +87,60 @@ function App() {
           },
           body: JSON.stringify({
             message: userMessage,
-            code: files[activeFile],
+            code: files[activeFile] || "",
             fileName: activeFile,
           }),
         },
       );
 
       if (!response.ok) {
-        throw new Error("Backend request failed");
+        let errorMessage = `Backend error ${response.status}`;
+
+        try {
+          const errorData = await response.json();
+
+          errorMessage =
+            errorData.details ||
+            errorData.error ||
+            errorData.message ||
+            errorMessage;
+        } catch {
+          const errorText = await response.text();
+
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
 
+      const aiReply =
+        data.reply ||
+        data.message ||
+        "AI responded successfully, but no reply was returned.";
+
       setMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          text: data.reply || data.message || "AI responded successfully.",
+          text: aiReply,
         },
       ]);
     } catch (error) {
+      console.error("AI Assistant error:", error);
+
       setMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          text: "❌ Could not connect to the AI backend. Please make sure your backend is running.",
+          text: `❌ ${error.message || "Something went wrong while contacting the AI backend."}`,
         },
       ]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -254,19 +285,25 @@ Building project...
                     : "message ai-message"
                 }
               >
-                {message.role === "ai" && <h3>AI</h3>}
-
-                {message.role === "user" && <h3>You</h3>}
+                <h3>{message.role === "user" ? "You" : "AI"}</h3>
 
                 <p>{message.text}</p>
               </div>
             ))}
+
+            {isLoading && (
+              <div className="message ai-message">
+                <h3>AI</h3>
+                <p>🤖 Thinking...</p>
+              </div>
+            )}
           </div>
 
           <div className="chat-input">
             <textarea
               placeholder="Ask AI anything about your code..."
               value={prompt}
+              disabled={isLoading}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -276,7 +313,12 @@ Building project...
               }}
             />
 
-            <button onClick={sendMessage}>Send</button>
+            <button
+              onClick={sendMessage}
+              disabled={isLoading || !prompt.trim()}
+            >
+              {isLoading ? "Sending..." : "Send"}
+            </button>
           </div>
         </aside>
       </div>
