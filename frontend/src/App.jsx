@@ -3,314 +3,195 @@ import Editor from "@monaco-editor/react";
 import "./App.css";
 
 const initialFiles = {
-  "App.jsx": {
-    language: "javascript",
-    code: `function App() {
+  "App.jsx": `function App() {
   return (
     <div>
-      <h1>Hello AI IDE</h1>
-      <p>Your React preview is working!</p>
+      <h1>Hello AI IDE!</h1>
+      <p>Start coding here.</p>
     </div>
   );
-}
-
-export default App;`,
-  },
-
-  "App.css": {
-    language: "css",
-    code: `body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-}
-
-h1 {
-  color: #2563eb;
 }`,
-  },
 
-  "main.jsx": {
-    language: "javascript",
-    code: `import React from "react";
+  "main.jsx": `import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
-import "./App.css";
+import App from "./App";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );`,
-  },
-
-  "package.json": {
-    language: "json",
-    code: `{
-  "name": "ai-ide",
-  "version": "1.0.0",
-  "private": true
-}`,
-  },
 };
 
 function App() {
   const [files, setFiles] = useState(initialFiles);
   const [activeFile, setActiveFile] = useState("App.jsx");
 
-  const [terminalOutput, setTerminalOutput] = useState(
-    "AI IDE terminal ready...",
-  );
-
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewTitle, setPreviewTitle] = useState("Hello AI IDE");
-
-  const [aiMessages, setAiMessages] = useState([
+  const [messages, setMessages] = useState([
     {
-      role: "ai",
-      text: "Hello! 👋 Ask me anything about your code.",
+      role: "assistant",
+      content:
+        "🤖 AI Assistant\n\nHello! Ask me to explain, debug, or improve your code.",
     },
   ]);
 
-  const [aiInput, setAiInput] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const currentFile = files[activeFile];
-
-  // EDITOR
   const handleEditorChange = (value) => {
-    setFiles((previousFiles) => ({
-      ...previousFiles,
-      [activeFile]: {
-        ...previousFiles[activeFile],
-        code: value || "",
-      },
+    setFiles((prev) => ({
+      ...prev,
+      [activeFile]: value || "",
     }));
   };
 
-  // RUN
-  const handleRun = () => {
-    const code = files["App.jsx"].code;
+  const handleSendMessage = async () => {
+    if (!input.trim() || loading) return;
 
-    const match = code.match(/<h1>(.*?)<\/h1>/);
+    const userMessage = input.trim();
 
-    const title = match ? match[1] : "Hello AI IDE";
-
-    setPreviewTitle(title);
-
-    setTerminalOutput(
-      `Running App.jsx...\n\n` +
-        `✓ React application started\n` +
-        `✓ Preview generated successfully`,
-    );
-
-    setShowPreview(true);
-  };
-
-  // AI ASSISTANT
-  const handleAISend = async () => {
-    if (!aiInput.trim() || aiLoading) return;
-
-    const messageToSend = aiInput;
-
-    setAiMessages((messages) => [
-      ...messages,
+    setMessages((prev) => [
+      ...prev,
       {
         role: "user",
-        text: messageToSend,
+        content: userMessage,
       },
     ]);
 
-    setAiInput("");
-    setAiLoading(true);
+    setInput("");
+    setLoading(true);
 
     try {
       const response = await fetch(
         "https://ai-de-backend.onrender.com/api/chat",
         {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
-            message: messageToSend,
-            files: files,
+            message: userMessage,
+            code: files[activeFile],
           }),
         },
       );
 
-      if (!response.ok) {
-        throw new Error(`Backend error: ${response.status}`);
-      }
-
       const data = await response.json();
 
-      setAiMessages((messages) => [
-        ...messages,
+      if (!response.ok) {
+        throw new Error(data.error || "AI request failed");
+      }
+
+      setMessages((prev) => [
+        ...prev,
         {
-          role: "ai",
-          text: data.reply || data.error || "No response received from AI.",
+          role: "assistant",
+          content: data.reply,
         },
       ]);
     } catch (error) {
-      console.error("AI backend error:", error);
+      console.error("AI Error:", error);
 
-      setAiMessages((messages) => [
-        ...messages,
+      setMessages((prev) => [
+        ...prev,
         {
-          role: "ai",
-          text: "❌ Could not connect to AI backend. Please make sure the Render backend is running.",
+          role: "assistant",
+          content:
+            "❌ Unable to connect to the AI backend. Please check your backend.",
         },
       ]);
     } finally {
-      setAiLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
   return (
-    <div className="ide">
-      {/* TOP BAR */}
-      <header className="topbar">
-        <div className="logo">⚡ AI IDE</div>
+    <div className="app">
+      <header className="header">
+        <h1>⚡ AI IDE</h1>
 
-        <div className="actions">
-          <button onClick={handleRun}>▶ Run</button>
-
+        <div className="buttons">
+          <button>▶ Run</button>
           <button>🐛 Debug</button>
-
           <button>Git</button>
-
           <button>Deploy</button>
         </div>
       </header>
 
-      <div className="main">
-        {/* EXPLORER */}
+      <div className="main-container">
         <aside className="explorer">
-          <div className="panel-title">EXPLORER</div>
+          <h3>EXPLORER</h3>
 
           <div className="folder">📁 src</div>
 
-          {["App.jsx", "App.css", "main.jsx"].map((file) => (
+          {Object.keys(files).map((file) => (
             <div
               key={file}
-              className={`file ${activeFile === file ? "active" : ""}`}
+              className={`file ${activeFile === file ? "active-file" : ""}`}
               onClick={() => setActiveFile(file)}
             >
               📄 {file}
             </div>
           ))}
-
-          <div className="folder">📁 public</div>
-
-          <div
-            className={`file ${activeFile === "package.json" ? "active" : ""}`}
-            onClick={() => setActiveFile("package.json")}
-          >
-            📄 package.json
-          </div>
         </aside>
 
-        {/* EDITOR */}
         <section className="editor-section">
-          <div className="editor-tabs">
-            <div className="tab active-tab">📄 {activeFile}</div>
+          <div className="editor-title">{activeFile}</div>
 
-            <div className="language">{currentFile.language}</div>
-          </div>
-
-          <div className="editor">
-            <Editor
-              height="100%"
-              language={currentFile.language}
-              theme="vs-dark"
-              value={currentFile.code}
-              onChange={handleEditorChange}
-              options={{
-                fontSize: 15,
-
-                minimap: {
-                  enabled: true,
-                },
-
-                automaticLayout: true,
-
-                padding: {
-                  top: 15,
-                },
-              }}
-            />
-          </div>
-
-          {/* TERMINAL */}
-          <div className="terminal">
-            <div className="terminal-title">TERMINAL</div>
-
-            <div className="terminal-content">
-              <span>$</span>
-
-              <pre>{terminalOutput}</pre>
-            </div>
-          </div>
+          <Editor
+            height="100%"
+            theme="vs-dark"
+            language="javascript"
+            value={files[activeFile]}
+            onChange={handleEditorChange}
+            options={{
+              minimap: {
+                enabled: false,
+              },
+              fontSize: 14,
+            }}
+          />
         </section>
 
-        {/* PREVIEW */}
-        {showPreview && (
-          <section className="preview">
-            <div className="preview-header">
-              <span>🌐 Preview</span>
-
-              <button onClick={() => setShowPreview(false)}>✕</button>
-            </div>
-
-            <div className="preview-content">
-              <h1>{previewTitle}</h1>
-
-              <p>Your React preview is working!</p>
-            </div>
-          </section>
-        )}
-
-        {/* AI ASSISTANT */}
         <aside className="assistant">
           <div className="assistant-header">🤖 AI Assistant</div>
 
-          <div className="assistant-content">
-            {aiMessages.map((message, index) => (
-              <div key={index} className={`ai-message ${message.role}`}>
-                <strong>{message.role === "ai" ? "AI:" : "You:"}</strong>
+          <div className="messages">
+            {messages.map((message, index) => (
+              <div key={index} className={`message ${message.role}`}>
+                <strong>{message.role === "user" ? "You:" : "AI:"}</strong>
 
-                <p>{message.text}</p>
+                <div className="message-content">{message.content}</div>
               </div>
             ))}
 
-            {aiLoading && (
-              <div className="ai-message ai">
+            {loading && (
+              <div className="message assistant">
                 <strong>AI:</strong>
 
-                <p>Thinking... ⏳</p>
+                <div className="message-content">🤔 Thinking...</div>
               </div>
             )}
           </div>
 
-          {/* AI INPUT */}
-          <div className="assistant-input">
-            <input
-              value={aiInput}
-              onChange={(e) => setAiInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleAISend();
-                }
-              }}
-              placeholder="Ask AI anything..."
-              disabled={aiLoading}
+          <div className="chat-input">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask AI about your code..."
+              rows="3"
             />
 
-            <button onClick={handleAISend} disabled={aiLoading}>
-              {aiLoading ? "..." : "Send"}
+            <button onClick={handleSendMessage} disabled={loading}>
+              {loading ? "Sending..." : "Send"}
             </button>
           </div>
         </aside>
