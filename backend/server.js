@@ -13,6 +13,11 @@ const PORT = 5000;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+console.log(
+  "Gemini key status:",
+  process.env.GEMINI_API_KEY ? "FOUND" : "MISSING",
+);
+
 app.get("/", (req, res) => {
   res.json({
     message: "AI IDE Gemini backend is running",
