@@ -110,9 +110,8 @@ function App() {
   const handleAISend = async () => {
     if (!aiInput.trim() || aiLoading) return;
 
-    const messageToSend = aiInput.trim();
+    const messageToSend = aiInput;
 
-    // Show user's message
     setAiMessages((messages) => [
       ...messages,
       {
@@ -141,31 +140,27 @@ function App() {
         },
       );
 
-      const data = await response.json();
-
-      console.log("Backend response:", data);
-
       if (!response.ok) {
-        throw new Error(data.error || "Backend error");
+        throw new Error(`Backend error: ${response.status}`);
       }
+
+      const data = await response.json();
 
       setAiMessages((messages) => [
         ...messages,
         {
           role: "ai",
-          text: data.reply || "No response received from the AI.",
+          text: data.reply || data.error || "No response received from AI.",
         },
       ]);
     } catch (error) {
-      console.error("AI Error:", error);
+      console.error("AI backend error:", error);
 
       setAiMessages((messages) => [
         ...messages,
         {
           role: "ai",
-          text:
-            "❌ Could not connect to AI backend.\n\n" +
-            "Please make sure the Render backend is running.",
+          text: "❌ Could not connect to AI backend. Please make sure the Render backend is running.",
         },
       ]);
     } finally {
