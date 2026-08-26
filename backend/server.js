@@ -24,9 +24,7 @@ app.get("/", (req, res) => {
   });
 });
 
-const sleep = (ms) => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 app.post("/api/chat", async (req, res) => {
   try {
@@ -42,7 +40,7 @@ app.post("/api/chat", async (req, res) => {
 
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({
-        error: "Gemini API key is not configured on the server.",
+        error: "Gemini API key is not configured.",
       });
     }
 
@@ -51,27 +49,63 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const prompt = `
-You are an AI coding assistant inside an AI IDE.
+You are the AI coding assistant inside a professional AI IDE.
 
-File name:
+You must analyze ONLY the code provided below.
+
+FILE NAME:
 ${fileName || "Unknown"}
 
-Current code:
-${code || "No code provided"}
+CODE:
+--------------------
+${code || "No code was provided."}
+--------------------
 
-User request:
+USER REQUEST:
 ${message}
 
-Help the user with the code.
+IMPORTANT DEBUGGING RULES:
 
-Important instructions:
-- Understand the user's exact request.
-- If they ask for an explanation, explain the code clearly and simply.
-- If they ask for debugging, identify the problem and provide corrected code.
-- If they ask for improvements, explain the improvements and provide code.
-- If they ask to write code, provide complete usable code.
-- If the user asks a general programming question, answer it directly.
-- Do not say the user's request was cut off unless it actually is incomplete.
+1. Analyze the EXACT code provided.
+2. Never invent missing code, variables, imports, exports, functions, or errors.
+3. Do not assume something is missing unless it is actually missing from the provided code.
+4. Before claiming a bug, verify that the bug actually exists in the provided code.
+5. If the code is already correct, clearly say:
+   "I don't see a bug in the provided code."
+6. If there is a bug, explain:
+   - What the actual problem is.
+   - Where it occurs.
+   - Why it causes a problem.
+   - How to fix it.
+7. When providing corrected code, preserve working parts of the original code.
+8. Do not remove valid code just to create a correction.
+9. For React code, check imports, exports, JSX syntax, hooks, state, props, event handlers, and component structure carefully.
+10. If the user's request is "debug", prioritize finding REAL bugs rather than suggesting general improvements.
+11. If there is no actual error, do not manufacture one.
+
+RESPONSE STYLE:
+
+For debugging, use this structure:
+
+### Debug Result
+
+**Problem:** 
+State the real problem, or say that no bug was found.
+
+**Why:**
+Explain the reason clearly.
+
+**Fix:**
+Provide corrected code only if a real fix is necessary.
+
+**Additional Notes:**
+Mention any optional improvements separately from actual bugs.
+
+For explanation requests, explain the code clearly.
+
+For code-generation requests, provide complete usable code.
+
+For improvement requests, distinguish between required fixes and optional improvements.
 `;
 
     const MAX_RETRIES = 3;
@@ -96,14 +130,14 @@ Important instructions:
 
         const status = error.status || error.statusCode;
 
-        const isTemporaryError =
+        const temporaryError =
           status === 429 ||
           status === 500 ||
           status === 502 ||
           status === 503 ||
           status === 504;
 
-        if (!isTemporaryError || attempt === MAX_RETRIES) {
+        if (!temporaryError || attempt === MAX_RETRIES) {
           throw error;
         }
 
@@ -141,7 +175,7 @@ Important instructions:
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Gemini API request failed.",
       details: error.message,
     });
