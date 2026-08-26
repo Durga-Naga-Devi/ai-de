@@ -10,7 +10,9 @@ const initialFiles = {
       <p>Start coding here.</p>
     </div>
   );
-}`,
+}
+
+export default App;`,
 
   "App.css": `body {
   margin: 0;
@@ -39,7 +41,7 @@ function App() {
   const [files, setFiles] = useState(initialFiles);
   const [activeFile, setActiveFile] = useState("App.jsx");
   const [prompt, setPrompt] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
 
   const [messages, setMessages] = useState([
     {
@@ -62,7 +64,7 @@ function App() {
   };
 
   const sendMessage = async () => {
-    if (!prompt.trim() || isLoading) return;
+    if (!prompt.trim() || isThinking) return;
 
     const userMessage = prompt.trim();
 
@@ -75,7 +77,7 @@ function App() {
     ]);
 
     setPrompt("");
-    setIsLoading(true);
+    setIsThinking(true);
 
     try {
       const response = await fetch(
@@ -87,60 +89,55 @@ function App() {
           },
           body: JSON.stringify({
             message: userMessage,
-            code: files[activeFile] || "",
+            code: files[activeFile],
             fileName: activeFile,
           }),
         },
       );
 
-      if (!response.ok) {
-        let errorMessage = `Backend error ${response.status}`;
+      let data = {};
 
-        try {
-          const errorData = await response.json();
-
-          errorMessage =
-            errorData.details ||
-            errorData.error ||
-            errorData.message ||
-            errorMessage;
-        } catch {
-          const errorText = await response.text();
-
-          if (errorText) {
-            errorMessage = errorText;
-          }
-        }
-
-        throw new Error(errorMessage);
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
       }
 
-      const data = await response.json();
-
-      const aiReply =
-        data.reply ||
-        data.message ||
-        "AI responded successfully, but no reply was returned.";
+      if (!response.ok) {
+        throw new Error(
+          data.error || data.details || `Backend error (${response.status})`,
+        );
+      }
 
       setMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          text: aiReply,
+          text: data.reply || data.message || "AI responded successfully.",
         },
       ]);
     } catch (error) {
-      console.error("AI Assistant error:", error);
+      console.error("AI request error:", error);
+
+      let errorMessage = error.message;
+
+      if (
+        error.message.includes("Failed to fetch") ||
+        error.message.includes("NetworkError")
+      ) {
+        errorMessage =
+          "Unable to reach the AI backend. Please check the backend connection.";
+      }
 
       setMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          text: `❌ ${error.message || "Something went wrong while contacting the AI backend."}`,
+          text: `❌ ${errorMessage}`,
         },
       ]);
     } finally {
-      setIsLoading(false);
+      setIsThinking(false);
     }
   };
 
@@ -157,14 +154,7 @@ function App() {
   };
 
   const handleDebug = () => {
-    setTerminal(
-      `🐛 Debug started...
-
-Checking ${activeFile}...
-
-✓ Debug session started
-✓ No runtime errors detected`,
-    );
+    setPrompt("Can you debug this code?");
   };
 
   const handleGit = () => {
@@ -192,7 +182,6 @@ Building project...
 
   return (
     <div className="ide">
-      {/* HEADER */}
       <header className="topbar">
         <div className="logo">⚡ AI IDE</div>
 
@@ -204,34 +193,21 @@ Building project...
         </div>
       </header>
 
-      {/* MAIN AREA */}
       <div className="main">
-        {/* EXPLORER */}
         <aside className="explorer">
           <h3>EXPLORER</h3>
 
           <div className="folder">📁 src</div>
 
-          <div
-            className={activeFile === "App.jsx" ? "file active" : "file"}
-            onClick={() => handleFileClick("App.jsx")}
-          >
-            📄 App.jsx
-          </div>
-
-          <div
-            className={activeFile === "App.css" ? "file active" : "file"}
-            onClick={() => handleFileClick("App.css")}
-          >
-            📄 App.css
-          </div>
-
-          <div
-            className={activeFile === "main.jsx" ? "file active" : "file"}
-            onClick={() => handleFileClick("main.jsx")}
-          >
-            📄 main.jsx
-          </div>
+          {["App.jsx", "App.css", "main.jsx"].map((file) => (
+            <div
+              key={file}
+              className={activeFile === file ? "file active" : "file"}
+              onClick={() => handleFileClick(file)}
+            >
+              📄 {file}
+            </div>
+          ))}
 
           <div className="folder">📁 public</div>
 
@@ -243,7 +219,6 @@ Building project...
           </div>
         </aside>
 
-        {/* EDITOR */}
         <section className="editor-panel">
           <div className="editor-header">{activeFile}</div>
 
@@ -271,7 +246,6 @@ Building project...
           />
         </section>
 
-        {/* AI ASSISTANT */}
         <aside className="ai-panel">
           <div className="ai-header">🤖 AI Assistant</div>
 
@@ -291,7 +265,7 @@ Building project...
               </div>
             ))}
 
-            {isLoading && (
+            {isThinking && (
               <div className="message ai-message">
                 <h3>AI</h3>
                 <p>🤖 Thinking...</p>
@@ -303,7 +277,7 @@ Building project...
             <textarea
               placeholder="Ask AI anything about your code..."
               value={prompt}
-              disabled={isLoading}
+              disabled={isThinking}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -315,15 +289,14 @@ Building project...
 
             <button
               onClick={sendMessage}
-              disabled={isLoading || !prompt.trim()}
+              disabled={isThinking || !prompt.trim()}
             >
-              {isLoading ? "Sending..." : "Send"}
+              {isThinking ? "Thinking..." : "Send"}
             </button>
           </div>
         </aside>
       </div>
 
-      {/* TERMINAL */}
       <section className="terminal">
         <div className="terminal-header">TERMINAL</div>
 
